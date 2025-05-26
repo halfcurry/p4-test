@@ -1,0 +1,41 @@
+version: '3.8' # Specifies the Docker Compose file format version
+
+services:
+  perforce-server:
+    # Use the Perforce Helix Core server image from Sourcegraph
+    image: sourcegraph/helix-p4d:latest # You can specify a version tag like sourcegraph/helix-p4d:2023.1
+    container_name: p4d-server
+    # Environment variables for Perforce server configuration
+    # Refer to https://github.com/sourcegraph/helix-docker for more options
+    environment:
+      - P4NAME=p4server_local # Name of the Perforce server instance
+      - P4PORT=1666           # Port the Perforce server will listen on inside the container
+      - P4USER=super          # Default superuser name
+      - P4PASSWD=YourStrongPassword123! # !IMPORTANT! Change this to a strong, unique password
+      # - P4CASE=-C1            # Case-sensitivity (C1 for case-insensitive on Windows, C0 for case-sensitive on Linux/macOS)
+      # - P4CHARSET=utf8        # Character set
+      # - JNL_PREFIX=p4server_local # Journal file prefix
+    ports:
+      - "1666:1666" # Map host port 1666 to container port 1666
+    volumes:
+      # Mount a named volume to persist Perforce server data
+      # This ensures your data (depots, users, workspaces, etc.) is not lost when the container is removed
+      - p4_server_data:/p4 # /p4 is the P4HOME directory inside the container
+    restart: unless-stopped # Restart policy for the container
+
+volumes:
+  # Define the named volume for persistent storage
+  p4_server_data:
+    driver: local # Use the local driver for the volume
+
+# Instructions:
+# 1. Save this content as 'docker-compose.yml' in a new directory.
+# 2. IMPORTANT: Change 'YourStrongPassword123!' in the P4PASSWD environment variable to a secure password.
+# 3. Open a terminal in that directory.
+# 4. Run 'docker-compose up -d' to start the Perforce server in detached mode.
+# 5. To connect with a Perforce client (like P4V):
+#    - Server: localhost:1666 (or your machine's IP if accessing from another machine on the network)
+#    - User: super
+#    - Password: The password you set for P4PASSWD
+# 6. To stop the server: 'docker-compose down'
+# 7. To view logs: 'docker-compose logs -f perforce-server'
