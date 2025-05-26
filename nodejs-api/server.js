@@ -71,11 +71,14 @@ async function executeP4Command(command, options = {}) {
       cwd: options.cwd || '/workspace',
       timeout: options.timeout || 30000
     });
-    
+
     if (stderr && !stderr.includes('warning')) {
       logger.warn(`P4 command warning: ${stderr}`);
     }
-    
+
+    // Corrected logging line in executeP4Command
+    logger.info(`P4 command stdout for "${fullCommand}":\n${stdout.trim()}`);
+
     return { success: true, output: stdout.trim(), error: null };
   } catch (error) {
     logger.error(`P4 command failed: ${error.message}`);
@@ -153,7 +156,7 @@ app.get('/api/info', async (req, res) => {
   }
 });
 
-// List files in depot
+// List files in depot (now returns raw output)
 app.get('/api/files', [
   query('path').optional().isString().withMessage('Path must be a string'),
   query('max').optional().isInt({ min: 1, max: 1000 }).withMessage('Max must be between 1 and 1000')
@@ -172,31 +175,17 @@ app.get('/api/files', [
       });
     }
 
-    const files = result.output.split('\n')
-      .filter(line => line.trim())
-      .map(line => {
-        const match = line.match(/^(.+?)#(\d+) - (\w+) change (\d+) \((.+?)\)(.*)$/);
-        if (match) {
-          return {
-            depotFile: match[1],
-            revision: parseInt(match[2]),
-            action: match[3],
-            change: parseInt(match[4]),
-            fileType: match[5],
-            description: match[6] ? match[6].trim() : ''
-          };
-        }
-        return { raw: line };
-      });
-
+    // --- MODIFIED SECTION ---
     res.json({
       success: true,
       data: {
-        files,
-        count: files.length,
+        rawOutput: result.output, // Return the raw output string
+        count: result.output.split('\n').filter(line => line.trim()).length, // Still provide a count
         path: depotPath
       }
     });
+    // --- END MODIFIED SECTION ---
+
   } catch (error) {
     logger.error('Error listing files:', error);
     res.status(500).json({
@@ -267,7 +256,7 @@ app.get('/api/files/history', [
       success: true,
       data: {
         path: filePath,
-        history: result.output
+        history: result.output // Return raw output for history
       }
     });
   } catch (error) {
@@ -305,28 +294,11 @@ app.get('/api/changes', [
       });
     }
 
-    const changes = result.output.split('\n')
-      .filter(line => line.trim())
-      .map(line => {
-        const match = line.match(/^Change (\d+) on (.+?) by (.+?)@(.+?) '(.+?)'(.*)$/);
-        if (match) {
-          return {
-            change: parseInt(match[1]),
-            date: match[2],
-            user: match[3],
-            client: match[4],
-            description: match[5],
-            status: match[6] ? match[6].trim() : 'submitted'
-          };
-        }
-        return { raw: line };
-      });
-
     res.json({
       success: true,
       data: {
-        changes,
-        count: changes.length
+        rawOutput: result.output, // Return raw output for changes
+        count: result.output.split('\n').filter(line => line.trim()).length
       }
     });
   } catch (error) {
@@ -360,7 +332,7 @@ app.get('/api/changes/:changeId', [
       success: true,
       data: {
         changeId: parseInt(changeId),
-        details: result.output
+        rawOutput: result.output // Return raw output for change details
       }
     });
   } catch (error) {
@@ -386,26 +358,11 @@ app.get('/api/users', async (req, res) => {
       });
     }
 
-    const users = result.output.split('\n')
-      .filter(line => line.trim())
-      .map(line => {
-        const match = line.match(/^(.+?) <(.+?)> \((.+?)\) accessed (.+?)$/);
-        if (match) {
-          return {
-            username: match[1],
-            email: match[2],
-            fullName: match[3],
-            lastAccessed: match[4]
-          };
-        }
-        return { raw: line };
-      });
-
     res.json({
       success: true,
       data: {
-        users,
-        count: users.length
+        rawOutput: result.output, // Return raw output for users
+        count: result.output.split('\n').filter(line => line.trim()).length
       }
     });
   } catch (error) {
@@ -437,7 +394,7 @@ app.post('/api/sync', [
       success: true,
       data: {
         path,
-        output: result.output,
+        rawOutput: result.output, // Return raw output for sync
         forced: force
       }
     });
@@ -459,19 +416,19 @@ app.get('/api/docs', (req, res) => {
     endpoints: {
       'GET /health': 'Health check',
       'GET /api/info': 'Get server information',
-      'GET /api/files': 'List files in depot (query: path, max)',
+      'GET /api/files': 'List files in depot (returns raw P4 output) (query: path, max)',
       'GET /api/files/content': 'Get file content (query: path, revision)',
-      'GET /api/files/history': 'Get file history (query: path, max)',
-      'GET /api/changes': 'List changes (query: max, status, user)',
-      'GET /api/changes/:changeId': 'Get change details',
-      'GET /api/users': 'List users',
-      'POST /api/sync': 'Sync files (body: path, force)',
+      'GET /api/files/history': 'Get file history (returns raw P4 output) (query: path, max)',
+      'GET /api/changes': 'List changes (returns raw P4 output) (query: max, status, user)',
+      'GET /api/changes/:changeId': 'Get change details (returns raw P4 output)',
+      'GET /api/users': 'List users (returns raw P4 output)',
+      'POST /api/sync': 'Sync files (returns raw P4 output) (body: path, force)',
       'GET /api/docs': 'This documentation'
     },
     examples: {
-      'List recent files': 'GET /api/files?path=//depot/...&max=10',
+      'List recent files (raw)': 'GET /api/files?path=//depot/...&max=10',
       'Get file content': 'GET /api/files/content?path=//depot/main/README.md',
-      'List recent changes': 'GET /api/changes?max=5',
+      'List recent changes (raw)': 'GET /api/changes?max=5',
       'Sync depot': 'POST /api/sync {"path": "//depot/..."}'
     }
   };

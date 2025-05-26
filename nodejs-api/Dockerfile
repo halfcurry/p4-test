@@ -17,6 +17,7 @@ RUN wget -qO - https://package.perforce.com/perforce.pubkey | apt-key add - \
     && rm -rf /var/lib/apt/lists/*
 
 # Set working directory
+# We'll keep /app as your main application directory
 WORKDIR /app
 
 # Copy package files
@@ -28,8 +29,13 @@ RUN npm install
 # Copy application code
 COPY . .
 
-# Create workspace directory
+# Create workspace directory for Perforce operations
+# This is where your client workspace will be rooted
 RUN mkdir -p /workspace
+
+# Copy the setup script into the container and make it executable
+COPY scripts/setup-perforce.sh /usr/local/bin/setup-perforce.sh
+RUN chmod +x /usr/local/bin/setup-perforce.sh
 
 # Expose port
 EXPOSE 3000
@@ -38,5 +44,6 @@ EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:3000/health || exit 1
 
-# Start the application
-CMD ["npm", "start"]
+# Start the application - this now runs the setup script first
+# The '&&' ensures 'npm start' only runs if the setup script succeeds.
+CMD ["sh", "-c", "/usr/local/bin/setup-perforce.sh && npm start"]

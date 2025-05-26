@@ -37,6 +37,7 @@ services:
       context: ./nodejs-api
       dockerfile: Dockerfile
     container_name: p4-nodejs-api
+    hostname: p4-node-client-host # Set a consistent hostname for the container
     ports:
       - "3000:3000"
     environment:
