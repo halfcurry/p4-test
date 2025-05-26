@@ -22,20 +22,47 @@ services:
       # This ensures your data (depots, users, workspaces, etc.) is not lost when the container is removed
       - p4_server_data:/p4 # /p4 is the P4HOME directory inside the container
     restart: unless-stopped # Restart policy for the container
+    healthcheck:
+      test: ["CMD", "p4", "-p", "localhost:1666", "-u", "super", "info"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    networks:
+      - p4_network
+
+  # Node.js API Server for Perforce Integration
+  nodejs-api:
+    build:
+      context: ./nodejs-api
+      dockerfile: Dockerfile
+    container_name: p4-nodejs-api
+    ports:
+      - "3000:3000"
+    environment:
+      - P4PORT=perforce-server:1666
+      - P4USER=super
+      - P4PASSWD=YourStrongPassword123!
+      - P4CLIENT=nodejs-client
+      - NODE_ENV=development
+    volumes:
+      - nodejs-api:/workspace
+    networks:
+      - p4_network
+    depends_on:
+      perforce-server:
+        condition: service_healthy
+    restart: unless-stopped
 
 volumes:
-  # Define the named volume for persistent storage
   p4_server_data:
-    driver: local # Use the local driver for the volume
+    driver: local
+  nodejs-api:
+    driver: local
 
-# Instructions:
-# 1. Save this content as 'docker-compose.yml' in a new directory.
-# 2. IMPORTANT: Change 'YourStrongPassword123!' in the P4PASSWD environment variable to a secure password.
-# 3. Open a terminal in that directory.
-# 4. Run 'docker-compose up -d' to start the Perforce server in detached mode.
-# 5. To connect with a Perforce client (like P4V):
-#    - Server: localhost:1666 (or your machine's IP if accessing from another machine on the network)
-#    - User: super
-#    - Password: The password you set for P4PASSWD
-# 6. To stop the server: 'docker-compose down'
-# 7. To view logs: 'docker-compose logs -f perforce-server'
+networks:
+  p4_network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
