@@ -55,10 +55,33 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
+  #MCP Server for AI Agent Integration
+  mcp-server:
+    build:
+      context: ./mcp-server
+      dockerfile: Dockerfile
+    container_name: perforce-mcp-server
+    environment:
+      - PERFORCE_API_URL=http://nodejs-api:3000/api
+      - NODE_ENV=development
+    volumes:
+      - mcp_data:/app/data
+    networks:
+      - p4_network
+    depends_on:
+      nodejs-api:
+        condition: service_started
+    restart: unless-stopped
+    # Expose stdio for MCP communication
+    stdin_open: true
+    tty: true
+
 volumes:
   p4_server_data:
     driver: local
   nodejs-api:
+    driver: local
+  mcp_data:
     driver: local
 
 networks:
